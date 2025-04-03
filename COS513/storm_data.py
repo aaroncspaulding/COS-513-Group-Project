@@ -1,7 +1,9 @@
+import os
 import logging
 from urllib.error import HTTPError
 
 import pandas as pd
+from tqdm.contrib.concurrent import thread_map
 
 from COS513.cache import get_cache_dir
 
@@ -10,7 +12,7 @@ logger = logging.getLogger(__name__)
 BASE_URL = 'https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/'
 FILE_TEMPLATE = 'StormEvents_details-ftp_v1.0_d{year}_c20250401.csv.gz'
 
-CACHE_DIR = get_cache_dir('COS513_CACHE_DIRECTORY', 'data')
+CACHE_DIRECTORY = get_cache_dir('COS513_CACHE_DIRECTORY', 'data')
 
 
 def load_year_of_noaa_storm_data(year: int | str) -> pd.DataFrame:
@@ -20,7 +22,10 @@ def load_year_of_noaa_storm_data(year: int | str) -> pd.DataFrame:
     if str(year) == '2020':
         filename = 'StormEvents_details-ftp_v1.0_d2020_c20240620.csv.gz'
 
-    local_path = CACHE_DIR / filename
+    cache_directory_for_noaa_storm_data = CACHE_DIRECTORY / 'NOAA_STORM_DATA'
+    cache_directory_for_noaa_storm_data.mkdir(parents=True, exist_ok=True)
+    local_path = cache_directory_for_noaa_storm_data / filename
+
     if not local_path.exists():
         url = BASE_URL + filename
         logger.info(f'Downloading: {url}')
@@ -38,8 +43,17 @@ def load_year_of_noaa_storm_data(year: int | str) -> pd.DataFrame:
     return df
 
 
-def _load_all_years_of_noaa_storm_data(years: list[int]) -> pd.DataFrame:
-    return pd.concat([load_year_of_noaa_storm_data(y) for y in years], ignore_index=True)
+def _load_all_years_of_noaa_storm_data(years: list[int], verbose: bool = True) -> pd.DataFrame:
+    max_workers = int(os.getenv('WORKERS', 12))
+
+    dfs = thread_map(
+        load_year_of_noaa_storm_data,
+        years,
+        max_workers=max_workers,
+        desc='Loading NOAA storm data' if verbose else None,
+        disable=not verbose,
+    )
+    return pd.concat(dfs, ignore_index=True)
 
 
 def load_all_years_of_noaa_storm_data(start_year: int = 1950, end_year: int = 2024) -> pd.DataFrame:
