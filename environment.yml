@@ -1,0 +1,11 @@
+name: COS513
+channels:
+  - conda-forge
+dependencies:
+  - matplotlib
+  - python
+  - pytorch
+  - jupyter
+  - numpy
+  - pandas
+  - tqdm
