@@ -2,6 +2,7 @@ import os
 import logging
 from urllib.error import HTTPError
 
+import numpy as np
 import pandas as pd
 from tqdm.contrib.concurrent import thread_map
 
@@ -43,8 +44,12 @@ def load_year_of_noaa_storm_data(year: int | str) -> pd.DataFrame:
     return df
 
 
-def _load_all_years_of_noaa_storm_data(years: list[int], verbose: bool = True) -> pd.DataFrame:
-    max_workers = int(os.getenv('WORKERS', 12))
+def _load_all_years_of_noaa_storm_data(
+    years: list[int],
+    verbose: bool = True,
+    max_workers: int = 12,
+) -> pd.DataFrame:
+    max_workers = int(os.getenv('WORKERS', max_workers))
 
     dfs = thread_map(
         load_year_of_noaa_storm_data,
@@ -56,8 +61,38 @@ def _load_all_years_of_noaa_storm_data(years: list[int], verbose: bool = True) -
     return pd.concat(dfs, ignore_index=True)
 
 
-def load_all_years_of_noaa_storm_data(start_year: int = 1950, end_year: int = 2024) -> pd.DataFrame:
-    return _load_all_years_of_noaa_storm_data(list(range(start_year, end_year + 1)))
+def load_all_years_of_noaa_storm_data(
+    start_year: int = 1950, end_year: int = 2024, *args, **kwargs
+) -> pd.DataFrame:
+    return _load_all_years_of_noaa_storm_data(
+        list(range(start_year, end_year + 1)), *args, **kwargs
+    )
+
+
+def decode_damage_property(value: str) -> float:
+    if pd.isna(value) or value == '':
+        return np.nan
+    value = str(value).strip().upper()
+    if value.endswith('K'):
+        try:
+            return float(value[:-1]) * 1_000
+        except ValueError:
+            # there's a single 'k'
+            return np.nan
+    elif value.endswith('M'):
+        try:
+            return float(value[:-1]) * 1_000_000
+        except ValueError:
+            # there's a single 'M'
+            return np.nan
+
+    elif value.endswith('B'):
+        return float(value[:-1]) * 1_000_000_000
+    else:
+        try:
+            return float(value)
+        except ValueError:
+            return 0.0
 
 
 if __name__ == '__main__':
