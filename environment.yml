@@ -11,3 +11,5 @@ dependencies:
   - tqdm
   - census
   - us
+  - pyarrow
+  - geopandas
